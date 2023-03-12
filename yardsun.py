@@ -9,6 +9,7 @@ import re
 import sys
 import os
 from itertools import chain
+from libcamera import controls
 from picamera2 import Picamera2, Preview
 from wand.image import Image
 
@@ -20,6 +21,7 @@ logging.basicConfig(
 now = datetime.datetime.now()
 nowday = now.strftime('%Y%m%d')
 nowtime = now.strftime('%H%M%S')
+photoroot = os.path.join(os.path.dirname(__file__), 'photos')
 
 def load_or_take_photo(filename):
   if filename is None:
@@ -32,8 +34,11 @@ def load_or_take_photo(filename):
 
 def take_photo():
   picam = Picamera2()
-  picam.start_and_capture_file('latest_photo.jpg')
-  img = Image(filename='latest_photo.jpg')
+  picam.configure(picam.create_still_configuration())
+  picam.set_controls({"AfMode": controls.AfModeEnum.Manual, "LensPosition": 0.0})
+  photofile = os.path.join(photoroot, 'latest_photo.jpg')
+  picam.start_and_capture_file(photofile, show_preview=False)
+  img = Image(filename=photofile)
   # Rotate to portrait
   img.rotate(degree=90)
   return img
@@ -45,24 +50,24 @@ def fix_perspective(img):
   scale = 1000 / img.height
   img.resize(math.floor(img.width * scale), math.floor(img.height * scale))
   # TODO: Draw a polygon where the src_points are before saving.
-  img.save(filename='latest_scaled.jpg')
+  img.save(filename=os.path.join(photoroot, 'latest_scaled.jpg'))
   order = chain.from_iterable(zip(src_points, dst_points))
   arguments = list(chain.from_iterable(order))
   img.distort('perspective', arguments)
   img.crop(0, 0, 200, 800)
-  img.save(filename='latest_flat.jpg')
+  img.save(filename=os.path.join(photoroot, 'latest_flat.jpg'))
   return img
 
 def threshold(img):
   img.transform_colorspace('gray')
   img.black_threshold(threshold='#666')
   img.white_threshold(threshold='#666')
-  img.save(filename='latest_threshold.png')
+  img.save(filename=os.path.join(photoroot, 'latest_threshold.png'))
   return img
 
 def save_latest(img):
-  img.save(filename='latest.jpg')
-  photodir = os.path.join(os.path.dirname(__file__), 'photos', nowday)
+  img.save(filename=os.path.join(photoroot, 'latest.jpg'))
+  photodir = os.path.join(photoroot, nowday)
   try:
     os.mkdir(photodir)
   except FileExistsError:
@@ -73,7 +78,7 @@ def save_latest(img):
 
 def update_averages(day):
   logging.info('update_averages')
-  photodir = os.path.join(os.path.dirname(__file__), 'photos', day)
+  photodir = os.path.join(photoroot, day)
   # Open every png, for each pixel average how many are white.
   imgs = []
   for photofile in os.listdir(photodir):
