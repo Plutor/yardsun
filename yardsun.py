@@ -1,3 +1,4 @@
+
 #!/usr/bin/python3
 
 import argparse
@@ -12,9 +13,10 @@ from itertools import chain
 from libcamera import controls
 from picamera2 import Picamera2, Preview
 from wand.image import Image
+from wand.drawing import Drawing
 
 logging.basicConfig(
-    level=logging.INFO,
+    level=logging.INFO, 
     format='[%(asctime)s] %(levelname)s - %(message)s',
 )
 
@@ -43,14 +45,21 @@ def take_photo():
   img.rotate(degree=90)
   return img
 
-src_points = ((203, 328), (402, 332), (750, 701), (137, 740))
+src_points = ((75, 519), (269, 529), (610, 960), (0, 999))
 dst_points = ((0, 0), (200, 0), (200, 800), (0, 800))
 def fix_perspective(img):
   logging.info('fix_perspective')
   scale = 1000 / img.height
   img.resize(math.floor(img.width * scale), math.floor(img.height * scale))
-  # TODO: Draw a polygon where the src_points are before saving.
-  img.save(filename=os.path.join(photoroot, 'latest_scaled.jpg'))
+  # Draw a polygon where the src_points are before saving.
+  with img.clone() as scl:
+    with Drawing() as draw:
+      draw.stroke_width = 2
+      draw.stroke_color = 'red'
+      draw.fill_opacity = 0
+      draw.polygon(list(src_points))
+      draw(scl)
+    scl.save(filename=os.path.join(photoroot, 'latest_scaled.jpg'))
   order = chain.from_iterable(zip(src_points, dst_points))
   arguments = list(chain.from_iterable(order))
   img.distort('perspective', arguments)
@@ -60,8 +69,8 @@ def fix_perspective(img):
 
 def threshold(img):
   img.transform_colorspace('gray')
-  img.black_threshold(threshold='#666')
-  img.white_threshold(threshold='#666')
+  img.black_threshold(threshold='#999')
+  img.white_threshold(threshold='#999')
   img.save(filename=os.path.join(photoroot, 'latest_threshold.png'))
   return img
 
