@@ -1,4 +1,3 @@
-
 #!/usr/bin/python3
 
 import argparse
@@ -9,9 +8,11 @@ import math
 import re
 import sys
 import os
+from dateutil import tz
 from itertools import chain
 from libcamera import controls
 from picamera2 import Picamera2, Preview
+from suntime import Sun, SunTimeException
 from wand.image import Image
 from wand.drawing import Drawing
 
@@ -20,9 +21,10 @@ logging.basicConfig(
     format='[%(asctime)s] %(levelname)s - %(message)s',
 )
 
-now = datetime.datetime.now()
+now = datetime.datetime.now(tz=tz.tzlocal())
 nowday = now.strftime('%Y%m%d')
 nowtime = now.strftime('%H%M%S')
+# TODO: Save all the files for every timestamp so we can re-scan later.
 photoroot = os.path.join(os.path.dirname(__file__), 'photos')
 
 def load_or_take_photo(filename):
@@ -37,7 +39,12 @@ def load_or_take_photo(filename):
 def take_photo():
   picam = Picamera2()
   picam.configure(picam.create_still_configuration())
-  picam.set_controls({"AfMode": controls.AfModeEnum.Manual, "LensPosition": 0.0})
+  picam.set_controls({"AfMode": controls.AfModeEnum.Manual,
+                      "LensPosition": 0.0,
+                      "ExposureTime": 100, # usec
+                      "AnalogueGain": 0.0,
+                      "AeEnable": False,
+                      "AwbEnable": False})
   photofile = os.path.join(photoroot, 'latest_photo.jpg')
   picam.start_and_capture_file(photofile, show_preview=False)
   img = Image(filename=photofile)
@@ -45,7 +52,7 @@ def take_photo():
   img.rotate(degree=90)
   return img
 
-src_points = ((75, 519), (269, 529), (610, 960), (0, 999))
+src_points = ((75, 519), (269, 519), (610, 960), (0, 999))
 dst_points = ((0, 0), (200, 0), (200, 800), (0, 800))
 def fix_perspective(img):
   logging.info('fix_perspective')
@@ -69,13 +76,12 @@ def fix_perspective(img):
 
 def threshold(img):
   img.transform_colorspace('gray')
-  img.black_threshold(threshold='#999')
-  img.white_threshold(threshold='#999')
+  img.black_threshold(threshold='#404040')
+  img.white_threshold(threshold='#404040')
   img.save(filename=os.path.join(photoroot, 'latest_threshold.png'))
   return img
 
 def save_latest(img):
-  img.save(filename=os.path.join(photoroot, 'latest.jpg'))
   photodir = os.path.join(photoroot, nowday)
   try:
     os.mkdir(photodir)
@@ -105,6 +111,19 @@ def update_averages(day):
     logging.info(f'Averaging {num} photos into {avgfile}')
     avg.save(filename=avgfile)
 
+def sun_is_up():
+  sun = Sun(args.lat, args.lng)
+  sunrise = sun.get_local_sunrise_time()
+  sunset = sun.get_local_sunset_time()
+  logging.debug(f'sunrise={sunrise}, now={now}, sunset={sunset}')
+  if now < sunrise:
+    logging.info(f'Sun does not rise until {sunrise}')
+    return False
+  if now > sunset:
+    logging.info(f'Sun went down at {sunset}')
+    return False
+  return True
+
 ########################################
 # main
 
@@ -112,7 +131,12 @@ parser = argparse.ArgumentParser(
                     prog='yardsun',
                     description='Watches the backyard for sun')
 parser.add_argument('-f', '--file')
+parser.add_argument('--lat', default=42.33, type=float)  # Boston, MA
+parser.add_argument('--lng', default=-71.03, type=float)
 args = parser.parse_args()
+
+if not sun_is_up():
+  os.exit(0)
 
 with load_or_take_photo(args.file) as orig:
   flat = fix_perspective(orig)
