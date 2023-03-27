@@ -24,8 +24,6 @@ logging.basicConfig(
 now = datetime.datetime.now(tz=tz.tzlocal())
 nowday = now.strftime('%Y%m%d')
 nowtime = now.strftime('%H%M%S')
-# TODO: Save all the files for every timestamp so we can re-scan later.
-photoroot = os.path.join(os.path.dirname(__file__), 'photos')
 
 def load_or_take_photo(filename):
   if filename is None:
@@ -45,12 +43,27 @@ def take_photo():
                       "AnalogueGain": 0.0,
                       "AeEnable": False,
                       "AwbEnable": False})
-  photofile = os.path.join(photoroot, 'latest_photo.jpg')
+  photofile = os.path.join(photoroot, 'latest-photo.jpg')
   picam.start_and_capture_file(photofile, show_preview=False)
   img = Image(filename=photofile)
   # Rotate to portrait
   img.rotate(degree=90)
   return img
+
+photoroot = os.path.join(os.path.dirname(__file__), 'photos')
+def save_image(img, imgtype):
+  f = os.path.join(photoroot, f'latest{imgtype}')
+  logging.info(f'Saving {f}')
+  img.save(filename=f)
+
+  photodir = os.path.join(photoroot, nowday)
+  try:
+    os.mkdir(photodir)
+  except FileExistsError:
+    pass
+  f = os.path.join(photodir, f'{nowtime}{imgtype}')
+  logging.info(f'Saving {f}')
+  img.save(filename=f)
 
 src_points = ((75, 519), (269, 519), (610, 960), (0, 999))
 dst_points = ((0, 0), (200, 0), (200, 800), (0, 800))
@@ -66,30 +79,19 @@ def fix_perspective(img):
       draw.fill_opacity = 0
       draw.polygon(list(src_points))
       draw(scl)
-    scl.save(filename=os.path.join(photoroot, 'latest_scaled.jpg'))
+    save_image(scl, '-scaled.jpg')
   order = chain.from_iterable(zip(src_points, dst_points))
   arguments = list(chain.from_iterable(order))
   img.distort('perspective', arguments)
   img.crop(0, 0, 200, 800)
-  img.save(filename=os.path.join(photoroot, 'latest_flat.jpg'))
+  save_image(img, '-flat.jpg')
   return img
 
 def threshold(img):
   img.transform_colorspace('gray')
   img.black_threshold(threshold='#404040')
   img.white_threshold(threshold='#404040')
-  img.save(filename=os.path.join(photoroot, 'latest_threshold.png'))
   return img
-
-def save_latest(img):
-  photodir = os.path.join(photoroot, nowday)
-  try:
-    os.mkdir(photodir)
-  except FileExistsError:
-    pass
-  photofile = os.path.join(photodir, f'{nowtime}.png')
-  logging.info(f'Saving {photofile}')
-  img.save(filename=photofile)
 
 def update_averages(day):
   logging.info('update_averages')
@@ -141,8 +143,6 @@ if not sun_is_up():
 with load_or_take_photo(args.file) as orig:
   flat = fix_perspective(orig)
   vals = threshold(flat)
-
-  save_latest(vals)
+  save_image(vals, '.png')
 
 update_averages(nowday)
-
