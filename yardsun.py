@@ -126,6 +126,15 @@ def sun_is_up():
     return False
   return True
 
+def is_sunny(img):
+  with img.clone() as c:
+    img.transform_colorspace('gray')
+    sunny = img.standard_deviation > args.min_stdev
+    if not sunny:
+      logging.info(f'Photo isn\'t sunny ({img.standard_deviation} < {args.min_stdev})')
+    return sunny
+
+
 ########################################
 # main
 
@@ -135,6 +144,7 @@ parser = argparse.ArgumentParser(
 parser.add_argument('-f', '--file')
 parser.add_argument('--lat', default=42.33, type=float)  # Boston, MA
 parser.add_argument('--lng', default=-71.03, type=float)
+parser.add_argument('--min_stdev', default=7000, type=float)  # Based on trial and error
 args = parser.parse_args()
 
 if not sun_is_up():
@@ -142,7 +152,8 @@ if not sun_is_up():
 
 with load_or_take_photo(args.file) as orig:
   flat = fix_perspective(orig)
-  vals = threshold(flat)
-  save_image(vals, '.png')
+  if is_sunny(flat):
+    vals = threshold(flat)
+    save_image(vals, '.png')
 
 update_averages(nowday)
