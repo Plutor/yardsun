@@ -93,26 +93,6 @@ def threshold(img):
   img.white_threshold(threshold='#404040')
   return img
 
-def update_averages(day):
-  logging.info('update_averages')
-  photodir = os.path.join(photoroot, day)
-  # Open every png, for each pixel average how many are white.
-  imgs = []
-  for photofile in os.listdir(photodir):
-    if not re.fullmatch(r'\d{6}\.png', photofile):
-      continue
-    imgs.append(Image(filename=os.path.join(photodir, photofile)))
-  num = len(imgs)
-  blendperc = '{:.0f}'.format(100/len(imgs))
-  logging.info(blendperc)
-  with imgs.pop() as avg:
-    for img in imgs:
-      avg.composite(img, operator='blend', arguments=blendperc)
-    # avg.merge_layers(method='merge')
-    avgfile = os.path.join(photodir, 'average.png')
-    logging.info(f'Averaging {num} photos into {avgfile}')
-    avg.save(filename=avgfile)
-
 def sun_is_up():
   sun = Sun(args.lat, args.lng)
   sunrise = sun.get_local_sunrise_time()
@@ -155,5 +135,3 @@ with load_or_take_photo(args.file) as orig:
   if is_sunny(flat):
     vals = threshold(flat)
     save_image(vals, '.png')
-
-update_averages(nowday)

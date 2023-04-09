@@ -11,6 +11,14 @@ $ apt install libmagickwand-dev python3-picamera2 imagemagick
 $ pip install Wand suntime
 ```
 
+Setup your crontab (`crontab -e`):
+
+```
+*/5 * * * *     /home/pi/yardsun/yardsun.py >> /home/pi/yardsun/yardsun.log 2>&1
+0 21 * * *      /home/pi/yardsun/mksummary.sh
+@reboot         cd /home/pi/yardsun && python -m http.server 8000
+```
+
 ## Dependencies
 
 * [suntime](https://github.com/SatAgro/suntime) for sunrise/sunset times
