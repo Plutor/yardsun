@@ -1,6 +1,7 @@
 # yardsun
 
-Watches my backyard for which areas get the most sun
+Watches my backyard for which areas get the most sun, and generates [summaries like this](https://imgur.com/r3gQUbP).
+(TODO: Update this example gif once the leaves come in.)
 
 ## Setup
 
