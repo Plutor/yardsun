@@ -17,7 +17,7 @@ from wand.image import Image
 from wand.drawing import Drawing
 
 logging.basicConfig(
-    level=logging.INFO, 
+    level=logging.INFO,
     format='[%(asctime)s] %(levelname)s - %(message)s',
 )
 
@@ -95,13 +95,13 @@ def threshold(img):
 
 def sun_is_up():
   sun = Sun(args.lat, args.lng)
-  sunrise = sun.get_local_sunrise_time()
-  sunset = sun.get_local_sunset_time()
+  sunrise = sun.get_local_sunrise_time(now.date())
+  sunset = sun.get_local_sunset_time(now.date())
   logging.debug(f'sunrise={sunrise}, now={now}, sunset={sunset}')
-  if now < sunrise:
+  if now.date() == sunrise.date() and now < sunrise:
     logging.info(f'Sun does not rise until {sunrise}')
     return False
-  if now > sunset:
+  if now.date() == sunset.date() and now > sunset:
     logging.info(f'Sun went down at {sunset}')
     return False
   return True
@@ -128,7 +128,7 @@ parser.add_argument('--min_stdev', default=7000, type=float)  # Based on trial a
 args = parser.parse_args()
 
 if not sun_is_up():
-  os.exit(0)
+  sys.exit(0)
 
 with load_or_take_photo(args.file) as orig:
   flat = fix_perspective(orig)
